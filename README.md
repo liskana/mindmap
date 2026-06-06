@@ -47,11 +47,6 @@ The representation: **Represent Panel**, which:
   - Represent value
   - Node label and type
 
-### Interaction
-Clicking an item will:
-- Focus the graph on the corresponding node
-- Center it in the visualization
-
 The panel can be toggled on/off and may be temporarily covered by other UI panels.
 
 ---
