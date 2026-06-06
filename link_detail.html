@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Link Detail</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/detail.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<div id="detail-layout">
+
+    <!-- MAIN CONTENT -->
+    <div id="detail-main">
+
+        <!-- TOP BAR -->
+        <div id="detail-topbar">
+            <button class="back-btn" onclick="window.location.href='index.html'">
+                ← Back to Graph
+            </button>
+        </div>
+
+        <!-- HEADER -->
+        <div id="detail-header">
+            <div class="detail-type-badge" id="linkTypeBadge"></div>
+            <h1 id="linkTitle">—</h1>
+            <div id="linkConnections" class="connections-list">
+                <span id="linkSourceNode" class="conn-node"></span>
+                <span class="conn-arrow">→</span>
+                <span id="linkTargetNode" class="conn-node"></span>
+            </div>
+        </div>
+
+        <!-- ATTRIBUTES SECTION -->
+        <div id="detail-content">
+            <div class="section-header">
+                <h2>Attributes</h2>
+                <button class="primary" onclick="openAddAttributeForm()">+ Add Attribute</button>
+            </div>
+
+            <!-- ADD / EDIT FORM -->
+            <div id="attributeForm" style="display:none;" class="attribute-form-card">
+                <input type="hidden" id="editAttrId">
+                <label>Attribute Type</label>
+                <div class="type-selector-row">
+                    <select id="attrTypeSelect"></select>
+                    <button class="small-add-btn" onclick="toggleInlineAttrTypeForm()">+</button>
+                </div>
+                <div id="inlineAttrTypeForm" style="display:none; margin-top:10px;">
+                    <label>New Attribute Type Name</label>
+                    <input type="text" id="newAttrTypeName" placeholder="e.g. Summary, Source, Date">
+                </div>
+                <label>Value</label>
+                <textarea id="attrValue" rows="4" placeholder="Enter description or value..."></textarea>
+                <div class="btn-group" style="margin-top:12px;">
+                    <button class="primary" onclick="handleSaveAttribute()">Save</button>
+                    <button onclick="closeAttributeForm()">Cancel</button>
+                </div>
+            </div>
+
+            <!-- ATTRIBUTE LIST -->
+            <div id="attributeList"></div>
+        </div>
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div id="detail-right-panel">
+        <h3>Hover Card</h3>
+        <p class="panel-hint">Select which attributes appear when hovering this link on the graph.</p>
+        <div id="hoverCardList"></div>
+    </div>
+
+</div>
+
+<script src="js/link_detail.js"></script>
+</body>
+</html>

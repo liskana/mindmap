@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --bg: #f1f1f1;
+            --panel-bg: #fbfbfb;
+            --shadow-dark: #d0d0d0;
+            --shadow-light: #ffffff;
+            --accent: #726bff;
+            --accent-2: #a64dfe;
+            --text: #1e293b;
+            --text-muted: #64748b;
+        }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--bg);
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        /* subtle grid background */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: 
+                linear-gradient(var(--shadow-dark) 1px, transparent 1px),
+                linear-gradient(90deg, var(--shadow-dark) 1px, transparent 1px);
+            background-size: 40px 40px;
+            opacity: 0.15;
+            pointer-events: none;
+        }
+
+        .card {
+            background: var(--panel-bg);
+            border-radius: 28px;
+            padding: 48px 44px;
+            width: 380px;
+            box-shadow: 10px 10px 24px var(--shadow-dark), -10px -10px 24px var(--shadow-light);
+            animation: float-in 0.5s cubic-bezier(0.2, 1, 0.2, 1) both;
+        }
+
+        @keyframes float-in {
+            from { opacity: 0; transform: translateY(20px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .card-header {
+            margin-bottom: 36px;
+        }
+
+        .logo {
+            font-family: 'DM Mono', monospace;
+            font-size: 11px;
+            font-weight: 500;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 14px;
+        }
+
+        .card-header h1 {
+            font-size: 26px;
+            font-weight: 600;
+            color: var(--text);
+            letter-spacing: -0.02em;
+            line-height: 1.2;
+        }
+
+        .card-header p {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+
+        .field {
+            margin-bottom: 18px;
+        }
+
+        .field label {
+            display: block;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .field input {
+            width: 100%;
+            padding: 14px 16px;
+            border: none;
+            border-radius: 14px;
+            background: var(--bg);
+            box-shadow: inset 3px 3px 7px var(--shadow-dark), inset -3px -3px 7px var(--shadow-light);
+            font-size: 14px;
+            font-family: 'DM Sans', sans-serif;
+            color: var(--text);
+            outline: none;
+            transition: box-shadow 0.2s ease;
+        }
+
+        .field input:focus {
+            box-shadow: inset 4px 4px 8px var(--shadow-dark), inset -2px -2px 6px var(--shadow-light), 0 0 0 2px var(--accent);
+        }
+
+        .field input::placeholder {
+            color: #b0b8c4;
+        }
+
+        .error-msg {
+            font-size: 12px;
+            color: #ef4444;
+            margin-top: 4px;
+            min-height: 16px;
+            padding-left: 2px;
+        }
+
+        .btn-login {
+            width: 100%;
+            height: 52px;
+            border: none;
+            border-radius: 30px;
+            font-size: 15px;
+            font-family: 'DM Sans', sans-serif;
+            font-weight: 600;
+            color: #fff;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            margin-top: 10px;
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+            box-shadow: 4px 4px 12px rgba(114, 107, 255, 0.35), -2px -2px 8px var(--shadow-light);
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+            letter-spacing: 0.02em;
+        }
+
+        .btn-login:hover {
+            transform: translateY(-1px);
+            box-shadow: 6px 6px 18px rgba(114, 107, 255, 0.45), -2px -2px 8px var(--shadow-light);
+        }
+
+        .btn-login:active {
+            transform: translateY(1px);
+            box-shadow: 2px 2px 8px rgba(114, 107, 255, 0.3);
+        }
+
+        .btn-login.loading {
+            pointer-events: none;
+            opacity: 0.75;
+        }
+
+        .btn-login .btn-text { transition: opacity 0.2s; }
+        .btn-login.loading .btn-text { opacity: 0; }
+
+        .spinner {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .btn-login.loading .spinner { opacity: 1; }
+
+        .spinner::after {
+            content: '';
+            width: 18px; height: 18px;
+            border: 2px solid rgba(255,255,255,0.4);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <div class="card-header">
+        <div class="logo">Mindmap</div>
+        <h1>Welcome back</h1>
+        <p>Sign in to your workspace</p>
+    </div>
+
+    <div class="field">
+        <label>Username</label>
+        <input type="text" id="username" placeholder="your username" autocomplete="username">
+    </div>
+
+    <div class="field">
+        <label>Password</label>
+        <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
+        <div class="error-msg" id="errorMsg"></div>
+    </div>
+
+    <button class="btn-login" id="loginBtn" onclick="handleLogin()">
+        <span class="btn-text">Sign In</span>
+        <div class="spinner"></div>
+    </button>
+</div>
+
+<script src="js/login.js"></script>
+
+</body>
+</html>

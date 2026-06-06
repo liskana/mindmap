@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visual Mindmap Graph</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<div id="main-layout">
+
+    <!-- LEFT PANEL -->
+    <div id="top-left-wrapper">
+        <button id="userBtn" onclick="toggleLeftPanel()">
+            <span id="userNameDisplay">User</span>
+        </button>
+    </div>
+    <div id="leftPanel" class="side-panel">
+        <div class="panel-section">
+            <h4>My Graphs</h4>
+            <ul id="graphList"></ul>
+            <button id="addGraphBtn" class="primary full-width" onclick="toggleNewGraphForm()" style="display:none; margin-top:12px;">+ New Graph</button>
+            <div id="newGraphForm" style="display:none; margin-top:12px;">
+                <label>Graph Name</label>
+                <input type="text" id="newGraphName" placeholder="e.g. Research Notes">
+                <button class="primary full-width" onclick="handleCreateGraph()" style="margin-top:8px;">Create</button>
+            </div>
+        </div>
+        <div class="panel-section">
+            <button class="danger full-width" onclick="handleLogout()">Sign Out</button>
+        </div>
+    </div>
+    <div id="repToggleBtn" onclick="toggleRepresentPanel()">
+        REPRESENT
+    </div>
+    <div id="representPanel" class="represent-panel hidden">
+        <div class="represent-header">
+            <span>Represent Nodes</span>
+            <!-- <button onclick="toggleRepresentPanel()">×</button> -->
+        </div>
+
+
+        <div id="representList"></div>
+    </div>
+    <!-- CANVAS -->
+    <div id="canvas-container">
+        <svg id="canvas"></svg>
+        <div id="graph-name-display"><span id="currentGraphName">—</span></div>
+        <div id="top-right-wrapper">
+            <button id="hoverActionBtn" onclick="toggleRightPanel()">
+                <img src="plus.png" alt="Add" class="plus-icon">
+            </button>
+            <div id="actionDropdown" class="dropdown-content">
+                <div class="dropdown-section">
+                    <h4>Object Types</h4>
+                    <ul id="dropdown-types"></ul>
+                </div>
+                <div class="dropdown-section">
+                    <h4>Objects (Nodes)</h4>
+                    <ul id="dropdown-nodes"></ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div id="rightPanel" class="side-panel">
+        <div class="panel-header">
+            <h3>Workspace Console</h3>
+        </div>
+
+        <!-- CREATE NEW -->
+        <div id="creatorConsoleContainer" class="panel-section">
+            <h4>Create New</h4>
+            <div class="creator-tabs">
+                <input type="radio" id="radio-obj-type" name="creatorMode" checked onchange="switchCreatorMode('OBJ_TYPE')">
+                <label class="tab" for="radio-obj-type">Object Type</label>
+                <input type="radio" id="radio-rel-type" name="creatorMode" onchange="switchCreatorMode('REL_TYPE')">
+                <label class="tab" for="radio-rel-type">Rel Type</label>
+                <input type="radio" id="radio-object" name="creatorMode" onchange="switchCreatorMode('OBJECT')">
+                <label class="tab" for="radio-object">Object</label>
+            </div>
+
+            <!-- OBJECT TYPE -->
+            <div id="form-add-obj-type">
+                <label>Type Name</label>
+                <input type="text" id="newObjTypeName" placeholder="e.g. Person, Concept">
+                <label>Color</label>
+                <input type="color" id="newObjTypeColor" value="#4f46e5">
+                <button class="primary full-width" onclick="handleCreateTypeOnly()">Save Object Type</button>
+            </div>
+
+            <!-- RELATION TYPE -->
+            <div id="form-add-rel-type" style="display:none;">
+                <label>Relation Type Name</label>
+                <input type="text" id="newRelTypeName" placeholder="e.g. causes, influences">
+                <label>Color</label>
+                <input type="color" id="newRelTypeColor" value="#10b981">
+                <button class="primary full-width" onclick="handleCreateRelationType()">Save Relation Type</button>
+            </div>
+
+            <!-- OBJECT -->
+            <div id="form-add-object" style="display:none;">
+                <label>Node Label</label>
+                <input type="text" id="objLabel" placeholder="e.g. Einstein">
+                <label>Object Type</label>
+                <div class="type-selector-row">
+                    <select id="objTypeSelect"></select>
+                    <button class="small-add-btn" onclick="triggerInlineTypeForm()">+</button>
+                </div>
+                <div id="inlineTypeForm" style="display:none; margin-top:12px;">
+                    <input type="text" id="inlineTypeName" placeholder="Type name">
+                    <input type="color" id="inlineTypeColor" value="#10b981">
+                </div>
+                <div id="relationFieldContainer" style="display:none;">
+                    <label>Relation to Parent</label>
+                    <input type="text" id="objRelation" value="extends">
+                </div>
+                <button class="primary full-width" style="margin-top:15px;" onclick="handleCreateObject()">Save Object</button>
+            </div>
+        </div>
+
+        <!-- NODE EDIT -->
+        <div id="nodeEditContainer" class="panel-section" style="display:none;">
+            <h3>Edit Node</h3>
+            <input type="hidden" id="editNodeId">
+            <label>Label</label>
+            <input type="text" id="editNodeLabel">
+            <label>Type</label>
+            <select id="editNodeTypeSelect"></select>
+            <div class="btn-group">
+                <button class="primary" onclick="handleUpdateNode()">Update</button>
+                <button class="danger" onclick="handleDeleteNode()">Delete</button>
+            </div>
+        </div>
+
+        <!-- LINK EDIT -->
+        <div id="linkFormContainer" class="panel-section" style="display:none;">
+            <h3>Edit Link</h3>
+            <input type="hidden" id="linkId">
+            <label>Label</label>
+            <input type="text" id="linkLabel">
+            <label>Relation Type</label>
+            <div class="type-selector-row">
+                <select id="editLinkTypeSelect" onchange="onLinkTypeChange()"></select>
+                <div id="linkTypeColorPreview" style="width:28px; height:28px; border-radius:8px; background:#94a3b8; flex-shrink:0;"></div>
+            </div>
+            <div class="btn-group">
+                <button class="primary" onclick="handleSaveLink()">Save</button>
+                <button class="danger" onclick="handleDeleteLink()">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="js/app.js"></script>
+</body>
+</html>

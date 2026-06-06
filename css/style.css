@@ -1,0 +1,707 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    background: #f1f1f1;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    color: #1e293b;
+}
+
+#main-layout {
+    display: flex;
+    width: 100vw;
+    height: 100vh;
+}
+
+#canvas-container {
+    flex: 1;
+    position: relative;
+    height: 100%;
+    background: #f1f1f1;
+}
+
+#canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* ============================================================
+   Side Panels
+   ============================================================ */
+.side-panel {
+    width: 280px;
+    height: 100%;
+    background: #fbfbfb;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.04);
+    display: flex;
+    flex-direction: column;
+    padding: 24px;
+    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 100;
+}
+
+#leftPanel {
+    transform: translateX(-100%);
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding-top: 7%;
+    pointer-events: none;
+    opacity: 0;
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease;
+}
+
+#leftPanel.active {
+    transform: translateX(0);
+    pointer-events: all;
+    opacity: 1;
+}
+
+#rightPanel {
+    width: 340px;
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.04);
+    position: absolute;
+    right: -340px;
+    top: 0;
+    transition: right 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#rightPanel.active {
+    right: 0;
+}
+
+/* ============================================================
+   Top Floating Buttons
+   ============================================================ */
+#top-left-wrapper {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    z-index: 99999;
+}
+
+#userBtn {
+    height: 38px;
+    padding: 0 16px;
+    border-radius: 20px;
+    border: none;
+    background: #ffffff;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    font-size: 13px;
+    font-weight: 600;
+    color: #0f172a;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+    z-index: 99999;
+}
+
+#userBtn:hover {
+    box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+    transform: translateY(-1px);
+}
+
+/* Current graph name display */
+#graph-name-display {
+    position: absolute;
+    top: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 50;
+    background: #ffffff;
+    border-radius: 20px;
+    padding: 6px 18px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    font-size: 13px;
+    font-weight: 600;
+    color: #475569;
+    pointer-events: none;
+}
+
+#hoverActionBtn {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: none;
+    background: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    z-index: 9999;
+    transition: all 0.25s ease;
+}
+
+.plus-icon {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+    transition: transform 0.25s ease;
+}
+
+#hoverActionBtn:hover {
+    transform: scale(1.05);
+}
+
+#hoverActionBtn.open {
+    background: #726bff;
+}
+
+#hoverActionBtn.open .plus-icon {
+    transform: rotate(45deg);
+}
+
+/* ============================================================
+   Panel Header & Sections
+   ============================================================ */
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 28px;
+}
+
+.panel-header h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.panel-close-btn {
+    background: none;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    color: #64748b;
+    transition: color 0.2s;
+    width: auto;
+    padding: 4px;
+}
+
+.panel-close-btn:hover {
+    color: #0f172a;
+}
+
+.panel-section {
+    margin-bottom: 24px;
+}
+
+.panel-section h4 {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: #94a3b8;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+}
+
+/* ============================================================
+   Form Inputs
+   ============================================================ */
+input[type="text"], select {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    font-size: 13px;
+    font-family: inherit;
+    color: #0f172a;
+    margin: 8px 0;
+    transition: all 0.2s;
+}
+
+input[type="color"], select {
+    width: 100%;
+    padding: 8px 16px;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    height: 50px;
+    color: #0f172a;
+    margin: 8px 0;
+    transition: all 0.2s;
+}
+
+input[type="text"]:focus, select:focus {
+    outline: none;
+    border-color: #726bff;
+    background: #ffffff;
+    box-shadow: 0 0 0 3px rgba(114, 107, 255, 0.12);
+}
+
+label {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: #94a3b8;
+    text-transform: uppercase;
+    margin-top: 4px;
+    margin-bottom: 2px;
+}
+
+/* ============================================================
+   Buttons
+   ============================================================ */
+button {
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 13px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+button.primary {
+    background: #726bff;
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(114, 107, 255, 0.2);
+}
+
+button.primary:hover {
+    background: #5b54e6;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(114, 107, 255, 0.3);
+}
+
+button.danger {
+    background: #fee2e2;
+    color: #ef4444;
+}
+
+button.danger:hover {
+    background: #fca5a5;
+    color: #b91c1c;
+}
+
+.full-width {
+    width: 100%;
+    margin-top: 8px;
+}
+
+.btn-group {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.btn-group button {
+    flex: 1;
+}
+
+.small-add-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    font-size: 20px;
+    font-weight: bold;
+    color: #726bff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.2s;
+}
+
+.small-add-btn:hover {
+    background: #e8e6ff;
+}
+
+.type-selector-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.type-selector-row select {
+    flex: 1;
+    margin: 8px 0;
+}
+
+/* ============================================================
+   Graph List
+   ============================================================ */
+#graphList {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 8px;
+    list-style: none;
+    padding: 0;
+}
+
+.graph-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 14px;
+    border-radius: 12px;
+    cursor: pointer;
+    color: #64748b;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    list-style: none;
+}
+
+.graph-item:hover {
+    background: rgba(114, 107, 255, 0.08);
+    color: #726bff;
+    transform: translateX(3px);
+}
+
+.graph-item.active {
+    background: rgba(114, 107, 255, 0.12);
+    color: #726bff;
+    border-left: 3px solid #726bff;
+    padding-left: 11px;
+    font-weight: 600;
+}
+
+/* ============================================================
+   Creator Tabs (pill toggle)
+   ============================================================ */
+.creator-tabs {
+    display: flex;
+    position: relative;
+    background: #ffffff;
+    padding: 6px;
+    border-radius: 999px;
+    box-shadow: 0 0 1px rgba(24,94,224,0.15), 0 6px 12px rgba(24,94,224,0.1);
+    margin-top: 18px;
+    margin-bottom: 18px;
+    gap: 4px;
+}
+
+.creator-tabs input[type="radio"] {
+    display: none;
+}
+
+.creator-tabs .tab {
+    height: 36px;
+    padding: 0 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: #64748b;
+    transition: background 0.2s ease, color 0.15s ease;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.creator-tabs input[type="radio"]:checked + .tab {
+    background: #eef2ff;
+    color: #4f46e5;
+}
+
+/* ============================================================
+   D3 Graph Elements
+   ============================================================ */
+.node-circle {
+    stroke: #ffffff;
+    stroke-width: 2px;
+    cursor: pointer;
+    transition: filter 0.2s;
+    filter: drop-shadow(0 4px 6px rgba(0,0,0,0.06));
+}
+
+.node-circle:hover {
+    filter: drop-shadow(0 6px 12px rgba(0,0,0,0.12));
+}
+
+.node-text {
+    font-size: 12px;
+    font-weight: 600;
+    fill: #334155;
+    pointer-events: none;
+    text-anchor: middle;
+}
+
+.link-line {
+    stroke: #94a3b8;
+    stroke-opacity: 0.5;
+    stroke-width: 2px;
+    cursor: pointer;
+    transition: stroke-opacity 0.2s, stroke-width 0.2s;
+}
+
+.link-line:hover {
+    stroke-opacity: 0.9;
+    stroke-width: 3px;
+}
+
+.link-text {
+    font-size: 10px;
+    font-weight: 500;
+    fill: #64748b;
+    pointer-events: none;
+    text-anchor: middle;
+}
+
+.drag-line {
+    stroke: #726bff;
+    stroke-width: 3px;
+    stroke-dasharray: 5,5;
+    pointer-events: none;
+}
+
+/* Node hover controls */
+.quick-control-btn {
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s, transform 0.15s ease;
+}
+
+.node-group:hover .quick-control-btn {
+    opacity: 1;
+}
+
+.quick-control-btn:hover {
+    transform: scale(1.2);
+}
+
+/* ============================================================
+   Dropdown Menu
+   ============================================================ */
+#top-right-wrapper {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    z-index: 9999;
+}
+
+.dropdown-content {
+    position: absolute;
+    top: 50px;
+    right: 0;
+    width: 220px;
+    background: #ffffff;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+    border-radius: 14px;
+    padding: 12px;
+    display: none;
+    opacity: 0;
+    transform: translateY(-8px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+#top-right-wrapper:hover .dropdown-content {
+    display: block;
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.dropdown-section { margin-bottom: 10px; }
+.dropdown-section:last-child { margin-bottom: 0; }
+
+.dropdown-section h4 {
+    font-size: 10px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 6px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.dropdown-section ul { list-style: none; max-height: 120px; overflow-y: auto; }
+
+.dropdown-section li {
+    font-size: 12px;
+    padding: 6px 8px;
+    color: #475569;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.dropdown-section li:hover { background: #f8fafc; color: #0f172a; }
+
+.type-badge {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+#hover-card {
+    position: fixed;
+    z-index: 999999;
+    background: white;
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,.15);
+    height: 240px;
+    width: 280px;
+    overflow-y: scroll;
+}
+
+.hover-card {
+    min-width: 240px;
+    max-width: 240px;
+
+    padding: 16px;
+    border-radius: 16px;
+
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+
+    box-shadow:
+        0 10px 25px rgba(0,0,0,0.12),
+        0 4px 10px rgba(0,0,0,0.08);
+
+    font-family: Inter, sans-serif;
+    pointer-events: auto;
+}
+
+.hover-card-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-bottom: 10px;
+}
+
+.hover-card-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #1e293b;
+
+    margin-bottom: 14px;
+    line-height: 1.2;
+}
+
+.hover-card-attrs {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.hover-card-attr {
+    padding-top: 10px;
+    border-top: 1px solid #e2e8f0;
+}
+
+.hover-card-attr:first-child {
+    border-top: none;
+    padding-top: 0;
+}
+
+.hover-card-attr-type {
+    display: block;
+
+    font-size: 13px;
+    font-weight: 600;
+
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+
+    color: #6366f1;
+
+    margin-bottom: 4px;
+}
+
+.hover-card-attr-value {
+    display: block;
+
+    font-size: 15px;
+    font-weight: 400;
+
+    color: #475569;
+    line-height: 1.4;
+}
+
+#representPanel {
+    position: fixed;
+    top: 130px;
+    left: 20px;
+    width: 240px;
+    max-height: 70vh;
+    overflow-y: auto;
+    background: white;
+    border-radius: 10px;
+    padding: 10px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    z-index: 50; /* < leftPanel */
+}
+
+#leftPanel {
+    z-index: 100;
+}
+
+.rep-item {
+    padding: 8px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.rep-item:hover {
+    background: #f1f5f9;
+}
+
+.rep-value {
+    font-weight: bold;
+    font-size: 14px;
+}
+
+.rep-label {
+    font-size: 12px;
+    color: #666;
+}
+
+.hidden {
+    display: none;
+}
+
+#repToggleBtn {
+    position: fixed;
+    top: 80px;
+    left: 20px;
+
+    padding: 6px 10px;
+    border-radius: 6px;
+
+    background: #4f46e5;
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+
+    cursor: pointer;
+    z-index: 80;
+
+    user-select: none;
+}
+
+/* hover */
+#repToggleBtn:hover {
+    background: #3730a3;
+}
