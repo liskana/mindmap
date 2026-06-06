@@ -109,6 +109,8 @@ Includes:
 - Node metadata
 - Attributes
 - Incoming and outgoing relationships
+- You can select the attributes to show on the hover card
+- enable create, edit, delete any attributes in that detail page
 
 ---
 
@@ -119,6 +121,8 @@ Includes:
 - Source & target nodes
 - Relationship type
 - Description and attributes
+- You can select the attributes to show on the hover card
+- enable create, edit, delete any attributes in that detail page
 
 ---
 
