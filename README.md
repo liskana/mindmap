@@ -38,8 +38,9 @@ Otherwise, nodes display: Label [Type]
 ---
 
 ## 📊 Represent Panel (Left Sidebar)
+The left sidebar contains 2 things: one is for the representation, and one is for your own account. If you have a list of graphs, it will show on the account page.
 
-The left sidebar contains a **Represent Panel**, which:
+The representation: **Represent Panel**, which:
 
 - Lists all nodes that contain a `represent` attribute
 - Displays:
