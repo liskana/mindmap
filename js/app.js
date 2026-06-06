@@ -101,7 +101,6 @@ function showHoverCard(x, y, attrs, label, color) {
                     <div class="hover-card-attr-type">
                         ${a.typeName}
                     </div>
-
                     <div class="hover-card-attr-value">
                         ${a.value}
                     </div>
@@ -110,18 +109,29 @@ function showHoverCard(x, y, attrs, label, color) {
         </div>
     `;
 
-    // 定位：避免超出畫面邊緣
     hoverCard.style.display = 'block';
-    const cardW = 220;
-    const cardH = hoverCard.offsetHeight;
+
+    const cardW = 280;
+    const cardH = 240;
+    const offset = 18;
+
     const winW = window.innerWidth;
     const winH = window.innerHeight;
 
-    let left = x + 18;
-    let top = y - 10;
-    if (left + cardW > winW - 20) left = x - cardW - 18;
-    if (top + cardH > winH - 20) top = winH - cardH - 20;
-    if (top < 10) top = 10;
+    const placeRight = (x + cardW + offset < winW);
+
+    let left = placeRight
+        ? x + offset
+        : x - cardW - offset;
+
+    const placeBottom = (y + cardH + offset < winH);
+
+    let top = placeBottom
+        ? y + offset
+        : y - cardH - offset;
+
+    left = Math.max(8, Math.min(left, winW - cardW - 8));
+    top = Math.max(8, Math.min(top, winH - cardH - 8));
 
     hoverCard.style.left = left + 'px';
     hoverCard.style.top = top + 'px';
