@@ -73,6 +73,12 @@ function renderHeader() {
     document.getElementById('linkTitle').textContent = linkData.description || 'Link';
     document.getElementById('linkSourceNode').textContent = linkData.source_node?.label || '?';
     document.getElementById('linkTargetNode').textContent = linkData.target_node?.label || '?';
+    const badgeEl = document.getElementById('aiSuggestedBadge');
+    if (badgeEl) {
+        badgeEl.innerHTML = linkData.created_by_ai
+            ? `<div class="ai-suggested-badge" title="${escapeHtml(linkData.ai_reasoning || '')}">🤖 AI Suggested — hover for reasoning</div>`
+            : '';
+    }
 }
 
 // ============================================================
@@ -147,6 +153,12 @@ function renderHoverCardPanel() {
         item.addEventListener('dragend', handleDragEnd);
         list.appendChild(item);
     });
+}
+
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str ?? '';
+    return div.innerHTML;
 }
 
 // ============================================================

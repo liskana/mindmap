@@ -12,13 +12,15 @@ let hoverOrderData = [];
 let attrTypesData = [];
 let isViewer = false;
 
-let dragState = null; // { id, source: 'list' | 'hover' }
+let dragState = null;
 
 let allNodes = [];
 let allLinks = [];
 let dbNodeTypes = [];
-let activeSelection = null; // { text, attrId }
+let activeSelection = null;
 let linkPopupBtnEl = null;
+
+let pdfDocumentsData = [];
 
 async function init() {
     const { data: { session } } = await supabaseClient.auth.getSession();
@@ -28,13 +30,18 @@ async function init() {
     const { data: member } = await supabaseClient.from('members').select('role').eq('id', session.user.id).single();
     isViewer = member?.role === 3;
 
-    await Promise.all([fetchNode(), fetchAttrTypes(), fetchAttributes(), fetchSearchIndex()]);
+    await Promise.all([fetchNode(), fetchAttrTypes(), fetchAttributes(), fetchSearchIndex(), fetchPdfDocuments()]);
     renderHeader();
     renderAttributeList();
     renderHoverCardPanel();
+    renderPdfList();
     populateAttrTypeSelect();
     applyViewerMode();
-    if (!isViewer) attachSelectionListener();
+    if (!isViewer) {
+        attachSelectionListener();
+        document.getElementById('pdfFileInput').addEventListener('change', handlePdfFileSelected);
+        ensureEmbeddingsForAttributes(attributesData).then(() => refreshSimilaritySuggestions());
+    }
 }
 
 function applyViewerMode() {
@@ -43,6 +50,10 @@ function applyViewerMode() {
     if (addBtn) addBtn.style.display = 'none';
     const rightPanel = document.getElementById('detail-right-panel');
     if (rightPanel) rightPanel.style.display = 'none';
+    const simSection = document.getElementById('similaritySection');
+    if (simSection) simSection.style.display = 'none';
+    const pdfUploadLabel = document.querySelector('.pdf-upload-btn');
+    if (pdfUploadLabel) pdfUploadLabel.style.display = 'none';
     document.querySelectorAll('.attribute-card').forEach(c => c.style.cursor = 'default');
 }
 
@@ -88,6 +99,13 @@ async function renderHeader() {
     const color = nodeData.node_types?.color || '#94a3b8';
     document.getElementById('nodeTypeBadge').style.background = color;
     document.getElementById('nodeTitle').textContent = nodeData.label;
+    
+    const badgeEl = document.getElementById('aiSuggestedBadge');
+    if (badgeEl) {
+        badgeEl.innerHTML = nodeData.created_by_ai
+            ? `<div class="ai-suggested-badge" title="${escapeHtml(nodeData.ai_reasoning || '')}">🤖 AI Suggested — hover for reasoning</div>`
+            : '';
+    }
 
     const { data: links } = await supabaseClient
         .from('links')
@@ -112,6 +130,259 @@ async function renderHeader() {
         container.appendChild(chip);
     });
 }
+
+// ============================================================
+// PDF DOCUMENTS
+// ============================================================
+
+async function fetchPdfDocuments() {
+    const { data } = await supabaseClient
+        .from('pdf_documents').select('*').eq('node_id', nodeId).order('uploaded_at', { ascending: false });
+    pdfDocumentsData = data || [];
+    for (const doc of pdfDocumentsData) {
+        const { count } = await supabaseClient
+            .from('pdf_chunks').select('id', { count: 'exact', head: true }).eq('document_id', doc.id);
+        doc.chunkCount = count || 0;
+    }
+}
+
+function renderPdfList() {
+    const list = document.getElementById('pdfDocumentList');
+    if (!list) return;
+    list.innerHTML = '';
+    if (pdfDocumentsData.length === 0) {
+        list.innerHTML = '<div class="empty-state">No documents uploaded yet.</div>';
+        return;
+    }
+    pdfDocumentsData.forEach(doc => {
+        const item = document.createElement('div');
+        item.className = 'pdf-doc-item';
+        item.innerHTML = `
+            <div class="pdf-doc-info">
+                <div class="pdf-doc-name">${escapeHtml(doc.file_name)}</div>
+                <div class="pdf-doc-meta">${doc.chunkCount} chunks indexed</div>
+            </div>
+            ${!isViewer ? `<button class="pdf-doc-delete-btn">✕</button>` : ''}
+        `;
+        const delBtn = item.querySelector('.pdf-doc-delete-btn');
+        if (delBtn) delBtn.onclick = () => handleDeletePdf(doc.id, doc.storage_path);
+        list.appendChild(item);
+    });
+}
+
+async function handlePdfFileSelected(e) {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    if (file.type !== 'application/pdf') { alert('Please select a PDF file'); return; }
+
+    const progressEl = document.getElementById('pdfUploadProgress');
+    progressEl.style.display = 'block';
+    progressEl.textContent = 'Reading PDF...';
+
+    try {
+        const arrayBuffer = await file.arrayBuffer();
+        const rawText = await window.extractPdfText(arrayBuffer);
+        if (!rawText || !rawText.trim()) {
+            alert('No extractable text found in this PDF (it might be a scanned/image-only PDF).');
+            progressEl.style.display = 'none';
+            return;
+        }
+        const chunks = window.chunkText(rawText);
+
+        progressEl.textContent = 'Saving document record...';
+        const { data: doc, error: docError } = await supabaseClient
+            .from('pdf_documents')
+            .insert([{ graph_id: graphId, node_id: nodeId, file_name: file.name }])
+            .select().single();
+        if (docError) throw docError;
+
+        progressEl.textContent = 'Uploading file...';
+        const storagePath = `${graphId}/${nodeId}/${doc.id}.pdf`;
+        const { error: uploadError } = await supabaseClient.storage
+            .from('pdfs').upload(storagePath, file, { contentType: 'application/pdf' });
+        if (uploadError) {
+            console.error('Storage upload failed (continuing without stored file):', uploadError);
+        } else {
+            await supabaseClient.from('pdf_documents').update({ storage_path: storagePath }).eq('id', doc.id);
+        }
+
+        const rows = [];
+        for (let i = 0; i < chunks.length; i++) {
+            progressEl.textContent = `Embedding chunk ${i + 1} / ${chunks.length}...`;
+            const vec = await window.computeEmbedding(chunks[i]);
+            if (!vec) continue;
+            rows.push({
+                document_id: doc.id,
+                chunk_index: i,
+                content: chunks[i].replace(/\u0000/g, ''),
+                embedding: window.embeddingToPgVector(vec)
+            });
+        }
+        if (rows.length > 0) {
+            const { error: chunkError } = await supabaseClient.from('pdf_chunks').insert(rows);
+            if (chunkError) throw chunkError;
+        }
+
+        progressEl.style.display = 'none';
+        await fetchPdfDocuments();
+        renderPdfList();
+        refreshSimilaritySuggestions();
+    } catch (err) {
+        console.error('PDF processing failed:', err);
+        alert('Failed to process PDF. Check console for details.');
+        progressEl.style.display = 'none';
+    }
+}
+
+async function handleDeletePdf(docId, storagePath) {
+    if (!confirm('Delete this document and all its indexed chunks?')) return;
+    if (storagePath) {
+        const { error } = await supabaseClient.storage.from('pdfs').remove([storagePath]);
+        if (error) console.error('Failed to delete storage file:', error);
+    }
+    const { error } = await supabaseClient.from('pdf_documents').delete().eq('id', docId);
+    if (error) { console.error(error); alert('Failed to delete document'); return; }
+    await fetchPdfDocuments();
+    renderPdfList();
+    refreshSimilaritySuggestions();
+}
+
+// ============================================================
+// EMBEDDINGS
+// ============================================================
+
+async function computeAndStoreEmbedding(attributeId, text) {
+    try {
+        const vec = await window.computeEmbedding(text);
+        if (!vec) return;
+        const { error } = await supabaseClient
+            .from('attribute_embeddings')
+            .upsert({ attribute_id: attributeId, embedding: window.embeddingToPgVector(vec), updated_at: new Date().toISOString() });
+        if (error) console.error('Failed to store embedding:', error);
+    } catch (err) {
+        console.error('Embedding computation failed:', err);
+    }
+}
+
+async function ensureEmbeddingsForAttributes(attrs) {
+    const withText = attrs.filter(a => a.value && a.value.trim());
+    if (withText.length === 0) return;
+    const ids = withText.map(a => a.id);
+    const { data: existing } = await supabaseClient
+        .from('attribute_embeddings').select('attribute_id').in('attribute_id', ids);
+    const existingSet = new Set((existing || []).map(e => e.attribute_id));
+    const missing = withText.filter(a => !existingSet.has(a.id));
+    for (const attr of missing) {
+        await computeAndStoreEmbedding(attr.id, attr.value);
+    }
+}
+
+// 這個 node 的整體語意向量 = attribute embedding + 自己附加的 PDF chunk embedding 一起平均
+async function getNodeAverageEmbedding() {
+    const vectors = [];
+
+    const attrIds = attributesData.filter(a => a.value && a.value.trim()).map(a => a.id);
+    if (attrIds.length > 0) {
+        const { data } = await supabaseClient.from('attribute_embeddings').select('embedding').in('attribute_id', attrIds);
+        (data || []).forEach(d => { const v = window.parsePgVector(d.embedding); if (v) vectors.push(v); });
+    }
+
+    const docIds = pdfDocumentsData.map(d => d.id);
+    if (docIds.length > 0) {
+        const { data: chunks } = await supabaseClient.from('pdf_chunks').select('embedding').in('document_id', docIds);
+        (chunks || []).forEach(c => { const v = window.parsePgVector(c.embedding); if (v) vectors.push(v); });
+    }
+
+    if (vectors.length === 0) return null;
+    return window.averageVectors(vectors);
+}
+
+async function fetchConnectedNodeIds() {
+    const { data: links } = await supabaseClient
+        .from('links').select('source, target')
+        .or(`source.eq.${nodeId},target.eq.${nodeId}`).eq('graph_id', graphId);
+    const set = new Set();
+    (links || []).forEach(l => {
+        if (l.source === nodeId) set.add(l.target);
+        if (l.target === nodeId) set.add(l.source);
+    });
+    return set;
+}
+
+window.refreshSimilaritySuggestions = async function () {
+    const container = document.getElementById('similarityResults');
+    if (!container) return;
+    container.innerHTML = '<div class="empty-state">Analyzing…</div>';
+
+    const avgVec = await getNodeAverageEmbedding();
+    if (!avgVec) {
+        container.innerHTML = '<div class="empty-state">Not enough content on this node yet to compare (add an attribute or PDF first).</div>';
+        return;
+    }
+
+    const connected = await fetchConnectedNodeIds();
+    const bestByNode = new Map();
+
+    // 1. 跟其他 node 的 attribute 比對
+    const { data: attrMatches, error: attrErr } = await supabaseClient.rpc('match_attribute_embeddings', {
+        query_embedding: window.embeddingToPgVector(avgVec),
+        match_count: 40,
+        exclude_node_id: nodeId
+    });
+    if (attrErr) console.error(attrErr);
+    (attrMatches || []).forEach(row => {
+        if (!row.node_id || row.node_id === nodeId || connected.has(row.node_id)) return;
+        const cur = bestByNode.get(row.node_id);
+        if (cur === undefined || row.similarity > cur) bestByNode.set(row.node_id, row.similarity);
+    });
+
+    // 2. 跟其他 node 附加的 PDF 內容比對
+    const { data: pdfMatches, error: pdfErr } = await supabaseClient.rpc('match_pdf_chunks', {
+        query_embedding: window.embeddingToPgVector(avgVec),
+        match_count: 40
+    });
+    if (pdfErr) console.error(pdfErr);
+    if (pdfMatches && pdfMatches.length > 0) {
+        const docIds = [...new Set(pdfMatches.map(m => m.document_id))];
+        const { data: docsMeta } = await supabaseClient.from('pdf_documents').select('id, node_id').in('id', docIds);
+        const docNodeMap = new Map((docsMeta || []).map(d => [d.id, d.node_id]));
+        pdfMatches.forEach(m => {
+            const targetNodeId = docNodeMap.get(m.document_id);
+            if (!targetNodeId || targetNodeId === nodeId || connected.has(targetNodeId)) return;
+            const cur = bestByNode.get(targetNodeId);
+            if (cur === undefined || m.similarity > cur) bestByNode.set(targetNodeId, m.similarity);
+        });
+    }
+
+    const sorted = [...bestByNode.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
+    if (sorted.length === 0) {
+        container.innerHTML = '<div class="empty-state">No similar unconnected nodes found.</div>';
+        return;
+    }
+
+    container.innerHTML = '';
+    sorted.forEach(([suggestedNodeId, similarity]) => {
+        const n = allNodes.find(x => x.id === suggestedNodeId);
+        if (!n) return;
+        const item = document.createElement('div');
+        item.className = 'similarity-item';
+        item.innerHTML = `
+            <span class="similarity-dot" style="background:${n.node_types?.color || '#94a3b8'}"></span>
+            <div class="similarity-info">
+                <div class="similarity-label">${n.label}</div>
+                <div class="similarity-type">${n.node_types?.type_name || ''}</div>
+            </div>
+            <div class="similarity-score">${Math.round(similarity * 100)}%</div>
+            <button class="small-connect-btn">Connect</button>
+        `;
+        item.querySelector('.small-connect-btn').onclick = async () => {
+            await ensureGraphEdge(nodeId, suggestedNodeId);
+            await Promise.all([fetchSearchIndex(), refreshSimilaritySuggestions()]);
+        };
+        container.appendChild(item);
+    });
+};
 
 // ============================================================
 // TEXT → HTML
@@ -143,7 +414,7 @@ function renderValueWithLinks(rawValue) {
 }
 
 // ============================================================
-// ATTRIBUTE LIST — 拖拽把手獨立於卡片，避免吃掉文字選取
+// ATTRIBUTE LIST
 // ============================================================
 
 function renderAttributeList() {
@@ -170,7 +441,7 @@ function renderAttributeList() {
                 openEditAttributeForm(attr);
             });
             const handle = card.querySelector('.attr-drag-handle');
-            handle.draggable = true; // 只有把手可拖，卡片本身不設 draggable
+            handle.draggable = true;
             handle.addEventListener('dragstart', (e) => handleDragStart(e, attr.id, 'list'));
             handle.addEventListener('dragend', handleDragEnd);
             card.addEventListener('dragover', (e) => handleDragOver(e, 'list'));
@@ -215,7 +486,7 @@ function renderHoverCardPanel() {
 }
 
 // ============================================================
-// DRAG & DROP（排序用，只從把手觸發）
+// DRAG & DROP
 // ============================================================
 
 function handleDragStart(e, id, source) {
@@ -315,7 +586,7 @@ function showLinkPopupBtn(rect) {
         linkPopupBtnEl = document.createElement('button');
         linkPopupBtnEl.id = 'textLinkPopupBtn';
         linkPopupBtnEl.className = 'text-link-popup-btn';
-        linkPopupBtnEl.textContent = '🔗 link';
+        linkPopupBtnEl.textContent = '🔗 Link';
         linkPopupBtnEl.onclick = openWikiLinkSearch;
         document.body.appendChild(linkPopupBtnEl);
     }
@@ -337,13 +608,13 @@ function openWikiLinkSearch() {
     modal.innerHTML = `
         <div class="wikilink-modal">
             <div class="wikilink-modal-header">
-                <span>link to「${escapeHtml(activeSelection.text)}」</span>
+                <span>Link "${escapeHtml(activeSelection.text)}"</span>
                 <button class="wikilink-modal-close">✕</button>
             </div>
-            <input type="text" id="wikilinkSearchInput" placeholder="looking for the existing node..." value="${escapeHtml(activeSelection.text)}">
+            <input type="text" id="wikilinkSearchInput" placeholder="Search existing node or relation..." value="${escapeHtml(activeSelection.text)}">
             <div id="wikilinkResults" class="wikilink-results"></div>
             <div class="wikilink-divider">or</div>
-            <button class="primary full-width" id="wikilinkCreateNewBtn">+ add new node「${escapeHtml(activeSelection.text)}」</button>
+            <button class="primary full-width" id="wikilinkCreateNewBtn">+ Create new node "${escapeHtml(activeSelection.text)}"</button>
         </div>
     `;
     document.body.appendChild(modal);
@@ -368,13 +639,13 @@ function closeWikiLinkModal(modal) {
 function renderWikiLinkResults(query, modal) {
     const resultsEl = modal.querySelector('#wikilinkResults');
     const q = query.trim().toLowerCase();
-    if (!q) { resultsEl.innerHTML = '<div class="wikilink-empty">enter the keyword...</div>'; return; }
+    if (!q) { resultsEl.innerHTML = '<div class="wikilink-empty">Type to search</div>'; return; }
 
     const nodeMatches = allNodes.filter(n => n.label.toLowerCase().includes(q)).slice(0, 8);
     const linkMatches = allLinks.filter(l => (l.description || '').toLowerCase().includes(q)).slice(0, 8);
 
     if (nodeMatches.length === 0 && linkMatches.length === 0) {
-        resultsEl.innerHTML = '<div class="wikilink-empty">No result found</div>';
+        resultsEl.innerHTML = '<div class="wikilink-empty">No matches found</div>';
         return;
     }
 
@@ -402,7 +673,7 @@ function openQuickNodeForm(modal) {
     const modalBody = modal.querySelector('.wikilink-modal');
     modalBody.innerHTML = `
         <div class="wikilink-modal-header">
-            <span>建立新 Node</span>
+            <span>Create New Node</span>
             <button class="wikilink-modal-close">✕</button>
         </div>
         <label>Label</label>
@@ -410,13 +681,13 @@ function openQuickNodeForm(modal) {
         <label>Type</label>
         <select id="quickNodeType"></select>
         <div class="btn-group">
-            <button class="primary" id="quickNodeSaveBtn">build and link</button>
-            <button id="quickNodeCancelBtn">取消</button>
+            <button class="primary" id="quickNodeSaveBtn">Create & Link</button>
+            <button id="quickNodeCancelBtn">Cancel</button>
         </div>
     `;
     const typeSelect = modalBody.querySelector('#quickNodeType');
     if (dbNodeTypes.length === 0) {
-        typeSelect.innerHTML = '<option value="">(此 graph 尚無 node type，請先到主畫面建立)</option>';
+        typeSelect.innerHTML = '<option value="">(No node types in this graph yet)</option>';
     } else {
         dbNodeTypes.forEach(t => {
             const opt = document.createElement('option');
@@ -430,11 +701,11 @@ function openQuickNodeForm(modal) {
     modalBody.querySelector('#quickNodeSaveBtn').onclick = async () => {
         const label = modalBody.querySelector('#quickNodeLabel').value.trim();
         const typeId = typeSelect.value;
-        if (!label) return alert('請輸入 label');
-        if (!typeId) return alert('請選擇 type');
+        if (!label) return alert('Please enter a label');
+        if (!typeId) return alert('Please select a type');
         const newId = crypto.randomUUID();
         const { error } = await supabaseClient.from('nodes').insert([{ id: newId, label, type_id: typeId, graph_id: graphId }]);
-        if (error) { console.error(error); alert('建立失敗'); return; }
+        if (error) { console.error(error); alert('Failed to create node'); return; }
         await applyWikiLink('node', newId, modal);
     };
 }
@@ -452,7 +723,7 @@ async function applyWikiLink(kind, targetId, modal) {
         : attr.value.slice(0, idx) + markup + attr.value.slice(idx + text.length);
 
     const { error } = await supabaseClient.from('attributes').update({ value: newValue }).eq('id', attrId);
-    if (error) { console.error(error); alert('儲存連結失敗'); modal.remove(); activeSelection = null; return; }
+    if (error) { console.error(error); alert('Failed to save link'); modal.remove(); activeSelection = null; return; }
 
     if (kind === 'node' && targetId !== nodeId) {
         await ensureGraphEdge(nodeId, targetId);
@@ -463,6 +734,7 @@ async function applyWikiLink(kind, targetId, modal) {
     await Promise.all([fetchAttributes(), fetchSearchIndex()]);
     renderAttributeList();
     renderHoverCardPanel();
+    refreshSimilaritySuggestions();
 }
 
 async function ensureGraphEdge(sourceId, targetId) {
@@ -473,7 +745,7 @@ async function ensureGraphEdge(sourceId, targetId) {
     if (exists) return;
     const { error } = await supabaseClient
         .from('links').insert([{ source: sourceId, target: targetId, description: 'related', graph_id: graphId }]);
-    if (error) console.error('建立 graph 連線失敗', error);
+    if (error) console.error('Failed to create graph edge:', error);
 }
 
 // ============================================================
@@ -545,22 +817,26 @@ window.handleSaveAttribute = async function() {
     }
     if (!typeId) return alert('Please select or create an attribute type!');
     if (!value) return alert('Please enter a value!');
+
     if (editId) {
         const { error } = await supabaseClient.from('attributes').update({ attribute_type_id: typeId, value }).eq('id', editId);
         if (error) { console.error(error); return; }
+        await computeAndStoreEmbedding(editId, value);
     } else {
         const nextOrder = attributesData.length;
-        const { error } = await supabaseClient.from('attributes').insert([{
+        const { data: inserted, error } = await supabaseClient.from('attributes').insert([{
             attribute_type_id: typeId, node_id: nodeId, value, show_on_hover: false,
             sort_order: nextOrder, hover_sort_order: nextOrder
-        }]);
+        }]).select().single();
         if (error) { console.error(error); return; }
+        await computeAndStoreEmbedding(inserted.id, value);
     }
     document.getElementById('attributeForm').style.display = 'none';
     document.getElementById('newAttrTypeName').value = '';
     await fetchAttributes();
     renderAttributeList();
     renderHoverCardPanel();
+    refreshSimilaritySuggestions();
 };
 
 window.handleToggleHover = async function(attrId, checked) {
@@ -575,9 +851,11 @@ window.handleDeleteAttribute = async function(attrId) {
     if (isViewer) return;
     if (!confirm('Delete this attribute?')) return;
     await supabaseClient.from('attributes').delete().eq('id', attrId);
+    await supabaseClient.from('attribute_embeddings').delete().eq('attribute_id', attrId);
     await fetchAttributes();
     renderAttributeList();
     renderHoverCardPanel();
+    refreshSimilaritySuggestions();
 };
 
 window.addEventListener('DOMContentLoaded', init);

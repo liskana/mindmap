@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/detail.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script type="module" src="js/embeddings.js"></script>
+    <script type="module" src="js/pdf-extract.js"></script>
 </head>
 <body>
 
@@ -26,6 +28,7 @@
         <div id="detail-header">
             <div class="detail-type-badge" id="nodeTypeBadge"></div>
             <h1 id="nodeTitle">—</h1>
+            <div id="aiSuggestedBadge"></div>
             <div id="nodeConnections" class="connections-list"></div>
         </div>
 
@@ -58,6 +61,27 @@
 
             <!-- ATTRIBUTE LIST -->
             <div id="attributeList"></div>
+            <!-- PDF SOURCE DOCUMENTS -->
+            <div id="pdfSection" style="margin-top:40px;">
+                <div class="section-header">
+                    <h2>Source Documents</h2>
+                    <label class="pdf-upload-btn">
+                        + Upload PDF
+                        <input type="file" id="pdfFileInput" accept="application/pdf" style="display:none;">
+                    </label>
+                </div>
+                <div id="pdfUploadProgress" style="display:none;" class="pdf-progress"></div>
+                <div id="pdfDocumentList"></div>
+            </div>
+            <!-- SIMILARITY SUGGESTIONS -->
+            <div id="similaritySection" style="margin-top:40px;">
+                <div class="section-header">
+                    <h2>Suggested Connections</h2>
+                    <button onclick="refreshSimilaritySuggestions()">🔄 Refresh</button>
+                </div>
+                <p class="panel-hint" style="margin-bottom:16px;">Based on semantic similarity between this node's attributes and others in the graph.</p>
+                <div id="similarityResults"></div>
+            </div>
         </div>
     </div>
 

@@ -728,6 +728,26 @@ button.danger:hover {
     transition: all 0.25s ease;
 }
 
+#analyzeBtn {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: none;
+    background: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    position: absolute;
+    top: 116px;
+    right: 16px;
+    z-index: 9999;
+    font-size: 16px;
+    color: #475569;
+    transition: all 0.25s ease;
+}
+
 #nodeListBtn:hover { transform: scale(1.05); color: #726bff; }
 #nodeListBtn.open { background: #726bff; color: #ffffff; }
 

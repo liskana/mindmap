@@ -1,0 +1,148 @@
+#analyze-layout {
+    width: 100vw;
+    height: 100vh;
+    background: #f1f1f1;
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    overflow-y: auto;
+    padding: 40px 48px;
+}
+
+#analyze-topbar {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 32px;
+}
+
+#analyze-topbar h1 {
+    font-size: 24px;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+#analyze-main {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    align-items: start;
+}
+
+.analyze-panel {
+    background: #fff;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+}
+
+.analyze-panel h2 {
+    font-size: 13px;
+    font-weight: 700;
+    color: #726bff;
+    margin: 20px 0 8px;
+}
+.analyze-panel h2:first-child { margin-top: 0; }
+
+.analyze-panel h3 {
+    font-size: 14px;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 20px 0 10px;
+}
+
+.analyze-search-results {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #f1f5f9;
+    border-radius: 12px;
+    margin-top: 4px;
+}
+
+.selected-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 12px 0;
+}
+
+.selected-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #eef2ff;
+    color: #4f46e5;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 10px;
+    border-radius: 20px;
+}
+
+.selected-chip button {
+    background: none;
+    border: none;
+    color: #4f46e5;
+    cursor: pointer;
+    padding: 0;
+    font-size: 11px;
+}
+
+.analyze-summary {
+    background: #f8fafc;
+    border-radius: 12px;
+    padding: 16px;
+    font-size: 13px;
+    color: #334155;
+    line-height: 1.6;
+}
+
+.suggestion-card {
+    border: 1px solid #f1f5f9;
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 12px;
+}
+
+.suggestion-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    color: #726bff;
+    background: #eef2ff;
+    padding: 3px 8px;
+    border-radius: 20px;
+    margin-bottom: 8px;
+}
+
+.suggestion-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.suggestion-meta {
+    font-size: 11px;
+    color: #94a3b8;
+    margin-top: 2px;
+}
+
+.suggestion-reasoning {
+    font-size: 12px;
+    color: #64748b;
+    margin-top: 8px;
+    line-height: 1.5;
+}
+
+.suggestion-create-btn {
+    margin-top: 12px;
+    font-size: 12px;
+    padding: 8px 14px;
+}
+
+.analyze-raw-output {
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 16px;
+    border-radius: 12px;
+    font-size: 11px;
+    white-space: pre-wrap;
+    overflow-x: auto;
+}

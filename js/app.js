@@ -214,6 +214,8 @@ function applyViewerMode() {
     if (actionBtn) actionBtn.style.display = 'none';
     // 隱藏右側面板
     d3.select("#rightPanel").classed("active", false);
+    const analyzeBtn = document.getElementById('analyzeBtn'); // 加這兩行
+    if (analyzeBtn) analyzeBtn.style.display = 'none';
 }
 
 // ============================================================
@@ -580,6 +582,14 @@ function renderDropdownMenu() {
         nodeList.append("li").text(n.label).on("click", () => { openNodeEditor(n); });
     });
 }
+
+// AI run analyze
+
+window.goToAnalyze = function () {
+    if (!currentGraphId) return;
+    window.location.href = `analyze.html?graph_id=${currentGraphId}`;
+};
+
 
 window.toggleRightPanel = function() {
     if (isViewer()) return;

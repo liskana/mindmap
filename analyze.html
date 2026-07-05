@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Analysis</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/analyze.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<div id="analyze-layout">
+    <div id="analyze-topbar">
+        <button class="back-btn" onclick="window.location.href='index.html'">← Back to Graph</button>
+        <h1>AI Analysis</h1>
+    </div>
+
+    <div id="analyze-main">
+        <div class="analyze-panel">
+            <h2>1. Select nodes / relations to analyze</h2>
+            <input type="text" id="analyzeSearchInput" placeholder="Search nodes or relations...">
+            <div id="analyzeSearchResults" class="analyze-search-results"></div>
+            <div id="selectedChips" class="selected-chips"></div>
+
+            <h2>2. What do you want to know? (optional)</h2>
+            <textarea id="analyzeQuestion" rows="3" placeholder="e.g. Are there relationships I'm missing? Any concepts worth extracting as new nodes?"></textarea>
+
+            <h2>3. Model</h2>
+            <select id="ollamaModelSelect"></select>
+            <p class="panel-hint" id="ollamaStatusHint">Checking Ollama connection...</p>
+
+            <button class="primary full-width" id="runAnalysisBtn" onclick="runAnalysis()">✨ Run Analysis</button>
+        </div>
+
+        <div class="analyze-panel">
+            <h2>Results</h2>
+            <div id="analysisResults"><div class="empty-state">Select some nodes/relations and run the analysis.</div></div>
+        </div>
+    </div>
+</div>
+
+<script src="js/analyze.js"></script>
+</body>
+</html>
