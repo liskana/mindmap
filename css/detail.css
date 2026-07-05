@@ -277,3 +277,201 @@
     font-size: 13px;
     padding: 40px 0;
 }
+
+/* ATTRIBUTE LIST ITEMS — 改成 flex 以容納拖拽把手 */
+.attribute-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background: #ffffff;
+    border-radius: 14px;
+    padding: 18px 20px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    border: 1px solid #f1f5f9;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.attribute-card:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+    border-color: #e2e8f0;
+}
+
+.attr-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.attr-drag-handle {
+    flex-shrink: 0;
+    cursor: grab;
+    color: #cbd5e1;
+    font-size: 15px;
+    line-height: 1;
+    letter-spacing: -1px;
+    padding: 2px 4px;
+    user-select: none;
+    touch-action: none;
+}
+
+.attr-drag-handle:hover { color: #726bff; }
+.attr-drag-handle:active { cursor: grabbing; }
+
+.attribute-card.dragging,
+.hover-card-item.dragging {
+    opacity: 0.4;
+}
+
+.attribute-card.drag-over {
+    border-color: #726bff;
+    box-shadow: 0 0 0 2px rgba(114,107,255,0.15);
+}
+
+/* HOVER CARD LIST — 加拖拽把手 */
+.hover-card-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 0;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.hover-drag-handle {
+    flex-shrink: 0;
+    cursor: grab;
+    color: #cbd5e1;
+    font-size: 14px;
+    line-height: 1;
+    letter-spacing: -1px;
+    padding-top: 2px;
+    user-select: none;
+    touch-action: none;
+}
+
+.hover-drag-handle:hover { color: #726bff; }
+
+.hover-card-item.drag-over {
+    background: rgba(114, 107, 255, 0.06);
+    border-radius: 8px;
+}
+
+/* 選字後浮出的連結按鈕 */
+.text-link-popup-btn {
+    position: absolute;
+    z-index: 100000;
+    background: #0f172a;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    display: none;
+}
+.text-link-popup-btn:hover { background: #1e293b; }
+
+/* wikilink 搜尋 modal */
+.wikilink-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100001;
+}
+
+.wikilink-modal {
+    width: 360px;
+    max-width: 90vw;
+    background: #fff;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+}
+
+.wikilink-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    font-size: 14px;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.wikilink-modal-header button {
+    background: none;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 2px 6px;
+}
+
+.wikilink-results {
+    max-height: 220px;
+    overflow-y: auto;
+    margin-top: 8px;
+    border: 1px solid #f1f5f9;
+    border-radius: 12px;
+}
+
+.wikilink-result-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #f8fafc;
+}
+.wikilink-result-item:last-child { border-bottom: none; }
+.wikilink-result-item:hover { background: #f8fafc; }
+
+.wikilink-result-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.wikilink-result-label {
+    flex: 1;
+    font-size: 13px;
+    color: #334155;
+    font-weight: 500;
+}
+
+.wikilink-result-type {
+    font-size: 10px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.wikilink-empty {
+    padding: 16px;
+    text-align: center;
+    font-size: 12px;
+    color: #94a3b8;
+}
+
+.wikilink-divider {
+    text-align: center;
+    font-size: 11px;
+    color: #cbd5e1;
+    margin: 14px 0;
+}
+
+/* 文字內超連結樣式 */
+.wiki-link {
+    color: #726bff;
+    text-decoration: underline;
+    text-decoration-color: rgba(114,107,255,0.4);
+    text-underline-offset: 2px;
+    font-weight: 600;
+}
+.wiki-link:hover { color: #5b54e6; }

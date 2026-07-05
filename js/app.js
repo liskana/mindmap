@@ -20,7 +20,7 @@ const LEFT_MARGIN = 0;
 const RIGHT_MARGIN = 0;
 const BOTTOM_MARGIN = 0;
 
-// hover card cache: id -> [{ typeName, value }]
+let nodeVisibility = {};
 let nodeHoverAttrs = {};
 let linkHoverAttrs = {};
 
@@ -29,53 +29,34 @@ let simulation;
 let isDraggingLink = false;
 let dragSourceNode = null;
 
-// hover card DOM element
 const hoverCard = document.createElement('div');
 hoverCard.id = 'hover-card';
 hoverCard.style.display = 'none';
 document.body.appendChild(hoverCard);
 
-
 let hoverCardTimeout = null;
 
 hoverCard.addEventListener('mouseenter', () => {
-
     hoveringCard = true;
-
-    if (hoverCardTimeout) {
-        clearTimeout(hoverCardTimeout);
-    }
-
+    if (hoverCardTimeout) clearTimeout(hoverCardTimeout);
 });
-
 hoverCard.addEventListener('mouseleave', () => {
-
     hoveringCard = false;
-
-    if (!hoveringNode) {
-        hideHoverCard();
-    }
-
+    if (!hoveringNode) hideHoverCard();
 });
+
+function isViewer() { return currentMember?.role === 3; }
 
 function avoidRects() {
     return function(alpha) {
-
         const width = getCanvasWidth();
-
         const blocks = [
             { x1: 0, y1: 0, x2: 300, y2: 150 },
             { x1: width - 300, y1: 0, x2: width, y2: 150 }
         ];
-
         nodesData.forEach(d => {
             blocks.forEach(b => {
-                if (
-                    d.x > b.x1 &&
-                    d.x < b.x2 &&
-                    d.y > b.y1 &&
-                    d.y < b.y2
-                ) {
+                if (d.x > b.x1 && d.x < b.x2 && d.y > b.y1 && d.y < b.y2) {
                     d.x += (d.x < (b.x1 + b.x2) / 2 ? -10 : 10) * alpha;
                     d.y += (d.y < (b.y1 + b.y2) / 2 ? -10 : 10) * alpha;
                 }
@@ -87,60 +68,33 @@ function avoidRects() {
 function showHoverCard(x, y, attrs, label, color) {
     clearTimeout(hoverCardTimeout);
     if (!attrs || attrs.length === 0) return;
-
     hoverCard.innerHTML = `
         <div class="hover-card-dot" style="background:${color}"></div>
-
-        <div class="hover-card-title">
-            ${label}
-        </div>
-
+        <div class="hover-card-title">${label}</div>
         <div class="hover-card-attrs">
             ${attrs.map(a => `
                 <div class="hover-card-attr">
-                    <div class="hover-card-attr-type">
-                        ${a.typeName}
-                    </div>
-                    <div class="hover-card-attr-value">
-                        ${a.value}
-                    </div>
+                    <div class="hover-card-attr-type">${a.typeName}</div>
+                    <div class="hover-card-attr-value">${a.value}</div>
                 </div>
             `).join('')}
         </div>
     `;
-
     hoverCard.style.display = 'block';
-
-    const cardW = 280;
-    const cardH = 240;
-    const offset = 18;
-
-    const winW = window.innerWidth;
-    const winH = window.innerHeight;
-
+    const cardW = 280, cardH = 240, offset = 18;
+    const winW = window.innerWidth, winH = window.innerHeight;
     const placeRight = (x + cardW + offset < winW);
-
-    let left = placeRight
-        ? x + offset
-        : x - cardW - offset;
-
+    let left = placeRight ? x + offset : x - cardW - offset;
     const placeBottom = (y + cardH + offset < winH);
-
-    let top = placeBottom
-        ? y + offset
-        : y - cardH - offset;
-
+    let top = placeBottom ? y + offset : y - cardH - offset;
     left = Math.max(8, Math.min(left, winW - cardW - 8));
     top = Math.max(8, Math.min(top, winH - cardH - 8));
-
     hoverCard.style.left = left + 'px';
     hoverCard.style.top = top + 'px';
 }
 
 function hideHoverCard() {
-    hoverCardTimeout = setTimeout(() => {
-        hoverCard.style.display = 'none';
-    }, 120);
+    hoverCardTimeout = setTimeout(() => { hoverCard.style.display = 'none'; }, 120);
 }
 
 function getCanvasWidth() {
@@ -162,11 +116,8 @@ async function checkAuth() {
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (!session) { window.location.href = 'login.html'; return false; }
     currentUser = session.user;
-
-    const { data: member } = await supabaseClient
-        .from('members').select('*').eq('id', currentUser.id).single();
+    const { data: member } = await supabaseClient.from('members').select('*').eq('id', currentUser.id).single();
     currentMember = member;
-
     const displayName = member?.name || currentUser.email.split('@')[0];
     document.getElementById('userNameDisplay').textContent = displayName;
     return true;
@@ -225,12 +176,15 @@ async function switchGraph(graphId) {
     const graph = myGraphs.find(g => g.id === graphId);
     document.getElementById('currentGraphName').textContent = graph?.name || 'Graph';
     renderGraphList();
+    nodeVisibility = {};
+    document.getElementById("nodeListBtn")?.classList.remove("open");
     await fetchData();
     updateRepToggleVisibility();
     renderGraph();
     renderRepresentPanel();
     renderDropdownMenu();
     updateTypeSelectOptions();
+    applyViewerMode();
 }
 
 window.handleCreateGraph = async function() {
@@ -250,6 +204,19 @@ window.toggleNewGraphForm = function() {
 };
 
 // ============================================================
+// VIEWER MODE
+// ============================================================
+
+function applyViewerMode() {
+    if (!isViewer()) return;
+    // 隱藏右上加號
+    const actionBtn = document.getElementById('hoverActionBtn');
+    if (actionBtn) actionBtn.style.display = 'none';
+    // 隱藏右側面板
+    d3.select("#rightPanel").classed("active", false);
+}
+
+// ============================================================
 // INIT
 // ============================================================
 
@@ -261,13 +228,10 @@ async function init() {
 
 async function fetchData() {
     if (!currentGraphId) return;
-
     const { data: types } = await supabaseClient.from('node_types').select('*').eq('graph_id', currentGraphId);
     dbTypes = types || [];
-
     const { data: linkTypes } = await supabaseClient.from('link_types').select('*').eq('graph_id', currentGraphId);
     dbLinkTypes = linkTypes || [];
-
     const { data: nodes } = await supabaseClient.from('nodes').select('*').eq('graph_id', currentGraphId);
     const typeMap = {};
     dbTypes.forEach(t => { typeMap[t.id] = { name: t.type_name, color: t.color }; });
@@ -275,7 +239,9 @@ async function fetchData() {
         const matchedType = typeMap[n.type_id] || { name: 'Uncategorized', color: '#94a3b8' };
         return { ...n, typeName: matchedType.name, color: matchedType.color };
     });
-
+    nodesData.forEach(n => {
+        if (nodeVisibility[n.id] === undefined) nodeVisibility[n.id] = true;
+    });
     const { data: links } = await supabaseClient.from('links').select('*').eq('graph_id', currentGraphId);
     const existingNodeIds = new Set(nodesData.map(n => n.id));
     const linkTypeMap = {};
@@ -292,8 +258,6 @@ async function fetchData() {
                 typeName: lt ? lt.name : null,
             };
         });
-
-    // 撈 hover attributes
     await fetchHoverAttrs();
     updateRepToggleVisibility();
     renderRepresentPanel();
@@ -302,28 +266,23 @@ async function fetchData() {
 async function fetchHoverAttrs() {
     const nodeIds = nodesData.map(n => n.id);
     const linkIds = linksData.map(l => l.id);
-
     nodeHoverAttrs = {};
     linkHoverAttrs = {};
-
     if (nodeIds.length > 0) {
         const { data } = await supabaseClient
-            .from('attributes')
-            .select('node_id, value, attribute_types(type_name)')
-            .eq('show_on_hover', true)
-            .in('node_id', nodeIds);
+            .from('attributes').select('node_id, value, attribute_types(type_name)')
+            .eq('show_on_hover', true).in('node_id', nodeIds)
+            .order('hover_sort_order', { ascending: true });   // ← 新增
         (data || []).forEach(a => {
             if (!nodeHoverAttrs[a.node_id]) nodeHoverAttrs[a.node_id] = [];
             nodeHoverAttrs[a.node_id].push({ typeName: a.attribute_types?.type_name || '', value: a.value || '' });
         });
     }
-
     if (linkIds.length > 0) {
         const { data } = await supabaseClient
-            .from('attributes')
-            .select('link_id, value, attribute_types(type_name)')
-            .eq('show_on_hover', true)
-            .in('link_id', linkIds);
+            .from('attributes').select('link_id, value, attribute_types(type_name)')
+            .eq('show_on_hover', true).in('link_id', linkIds)
+            .order('hover_sort_order', { ascending: true });   // ← 新增
         (data || []).forEach(a => {
             if (!linkHoverAttrs[a.link_id]) linkHoverAttrs[a.link_id] = [];
             linkHoverAttrs[a.link_id].push({ typeName: a.attribute_types?.type_name || '', value: a.value || '' });
@@ -334,34 +293,24 @@ async function fetchHoverAttrs() {
 // ============================================================
 // GRAPH RENDER
 // ============================================================
+
 function updateRepToggleVisibility() {
     const btn = document.getElementById("repToggleBtn");
-
     const hasRep = nodesData.some(n => {
         const attrs = nodeHoverAttrs[n.id];
         return attrs?.some(a => a.typeName === "represent" && a.value);
     });
-
     btn.style.display = hasRep ? "block" : "none";
 }
 
 function buildRepresentList() {
     const list = [];
-
     nodesData.forEach(n => {
         const attrs = nodeHoverAttrs[n.id];
         const rep = attrs?.find(a => a.typeName === "represent");
-
         if (!rep?.value) return;
-
-        list.push({
-            id: n.id,
-            label: n.label,
-            type: n.typeName,
-            represent: rep.value
-        });
+        list.push({ id: n.id, label: n.label, type: n.typeName, represent: rep.value });
     });
-
     return list;
 }
 
@@ -375,20 +324,15 @@ function renderGraph() {
     arrowColors.forEach(color => {
         const safeId = 'arrow-' + color.replace('#', '');
         defs.append("marker")
-            .attr("id", safeId)
-            .attr("viewBox", "0 -5 10 10")
+            .attr("id", safeId).attr("viewBox", "0 -5 10 10")
             .attr("refX", 23).attr("refY", 0)
-            .attr("markerWidth", 6).attr("markerHeight", 6)
-            .attr("orient", "auto")
+            .attr("markerWidth", 6).attr("markerHeight", 6).attr("orient", "auto")
             .append("path").attr("d", "M0,-4L10,0L0,4").attr("fill", color);
     });
 
     const dragLine = svg.append("line")
-        .attr("class", "drag-line")
-        .style("display", "none")
-        .attr("stroke", "#4f46e5")
-        .attr("stroke-width", 3)
-        .attr("stroke-dasharray", "5,5");
+        .attr("class", "drag-line").style("display", "none")
+        .attr("stroke", "#4f46e5").attr("stroke-width", 3).attr("stroke-dasharray", "5,5");
 
     simulation = d3.forceSimulation(nodesData)
         .force("link", d3.forceLink(linksData).id(d => d.id).distance(130))
@@ -397,10 +341,13 @@ function renderGraph() {
         .force("collision", d3.forceCollide().radius(60))
         .force("avoidUI", avoidRects());
 
+    const viewer = isViewer();
+
     const linkGroup = svg.append("g").selectAll("g")
         .data(linksData).join("g")
         .attr("class", "link-group")
         .on("click", (e, d) => {
+            if (viewer) return; // viewer 不開編輯
             e.stopPropagation();
             selectedLinkId = d.id;
             openLinkEditor(d);
@@ -412,15 +359,11 @@ function renderGraph() {
         })
         .on("mouseover", (e, d) => {
             const attrs = linkHoverAttrs[d.id];
-            if (attrs && attrs.length > 0) {
-                showHoverCard(e.clientX, e.clientY, attrs, d.description, d.typeColor);
-            }
+            if (attrs && attrs.length > 0) showHoverCard(e.clientX, e.clientY, attrs, d.description, d.typeColor);
         })
         .on("mousemove", (e, d) => {
             const attrs = linkHoverAttrs[d.id];
-            if (attrs && attrs.length > 0) {
-                showHoverCard(e.clientX, e.clientY, attrs, d.description, d.typeColor);
-            }
+            if (attrs && attrs.length > 0) showHoverCard(e.clientX, e.clientY, attrs, d.description, d.typeColor);
         })
         .on("mouseout", () => hideHoverCard());
 
@@ -430,8 +373,7 @@ function renderGraph() {
         .attr("marker-end", d => `url(#arrow-${d.typeColor.replace('#', '')})`);
 
     const linkText = linkGroup.append("text")
-        .attr("class", "link-text")
-        .attr("text-anchor", "middle")
+        .attr("class", "link-text").attr("text-anchor", "middle")
         .text(d => d.description);
 
     function renderLinkHighlight() {
@@ -446,17 +388,12 @@ function renderGraph() {
             .style("font-weight", d => d.id === selectedLinkId ? "bold" : "normal");
     }
     renderLinkHighlight();
-    const nodeRepresentMap = {};
-    nodesData.forEach(n => {
-        const attrs = nodeHoverAttrs[n.id];
-        const rep = attrs?.find(a => a.typeName === "represent");
-        if (rep) nodeRepresentMap[n.id] = rep.value;
-    });
 
     const nodeGroup = svg.append("g").selectAll("g")
         .data(nodesData).join("g")
         .attr("class", "node-group")
         .on("click", (e, d) => {
+            if (viewer) return;
             e.stopPropagation();
             selectedLinkId = null;
             renderLinkHighlight();
@@ -466,148 +403,94 @@ function renderGraph() {
             e.stopPropagation();
             window.location.href = `node_detail.html?id=${d.id}&graph_id=${currentGraphId}`;
         })
-        .on("mouseover", (e, d) => {
-            const attrs = nodeHoverAttrs[d.id];
-            if (attrs && attrs.length > 0) {
-                showHoverCard(e.clientX, e.clientY, attrs, d.label, d.color);
-            }
-        })
         .on("mouseenter", (e, d) => {
-
             hoveringNode = true;
-
             const attrs = nodeHoverAttrs[d.id];
-
-            if (attrs && attrs.length > 0) {
-                showHoverCard(
-                    e.clientX,
-                    e.clientY,
-                    attrs,
-                    d.label,
-                    d.color
-                );
-            }
-
+            if (attrs && attrs.length > 0) showHoverCard(e.clientX, e.clientY, attrs, d.label, d.color);
         })
-
-        .on("mouseleave", () => {
-
-            hoveringNode = false;
-
-            setTimeout(() => {
-
-                if (!hoveringNode && !hoveringCard) {
-                    hideHoverCard();
-                }
-
-            }, 100);
-
-        })
-
         .on("mousemove", (e, d) => {
             const attrs = nodeHoverAttrs[d.id];
-            if (attrs && attrs.length > 0) {
-                showHoverCard(e.clientX, e.clientY, attrs, d.label, d.color);
-            }
+            if (attrs && attrs.length > 0) showHoverCard(e.clientX, e.clientY, attrs, d.label, d.color);
+        })
+        .on("mouseleave", () => {
+            hoveringNode = false;
+            setTimeout(() => { if (!hoveringNode && !hoveringCard) hideHoverCard(); }, 100);
         });
-        // .on("mouseout", () => hideHoverCard());
 
     nodeGroup.append("circle")
-        .attr("class", "node-circle")
-        .attr("r", 14)
-        .attr("fill", d => d.color);
+        .attr("class", "node-circle").attr("r", 14).attr("fill", d => d.color);
 
     nodeGroup.append("text")
-        .attr("class", "node-text")
-        .attr("y", -22)
+        .attr("class", "node-text").attr("y", -22)
         .text(d => {
             const attrs = nodeHoverAttrs[d.id];
             const rep = attrs?.find(a => a.typeName === "represent");
-
-            // ⭐ 有 represent → 顯示 represent
             if (rep?.value) return rep.value;
-
-            // ⭐ 沒 represent → 顯示 label + type
             return `${d.label} [${d.typeName}]`;
         });
 
-    const hoverControls = nodeGroup.append("g").attr("class", "hover-controls-group");
+    // hover controls — viewer 完全不渲染
+    if (!viewer) {
+        const hoverControls = nodeGroup.append("g").attr("class", "hover-controls-group");
 
-    const quickAddBtn = hoverControls.append("g")
-        .attr("class", "quick-control-btn")
-        .attr("transform", "translate(22, -10)")
-        .on("click", (e, d) => { e.stopPropagation(); openExtendObjectConsole(d); });
-    quickAddBtn.append("circle").attr("r", 9).attr("fill", "#10b981");
-    quickAddBtn.append("text")
-        .attr("text-anchor", "middle").attr("dy", "3.5").attr("fill", "#ffffff")
-        .style("font-size", "11px").style("font-weight", "bold").text("+");
+        const quickAddBtn = hoverControls.append("g")
+            .attr("class", "quick-control-btn")
+            .attr("transform", "translate(22, -10)")
+            .on("click", (e, d) => { e.stopPropagation(); openExtendObjectConsole(d); });
+        quickAddBtn.append("circle").attr("r", 9).attr("fill", "#10b981");
+        quickAddBtn.append("text")
+            .attr("text-anchor", "middle").attr("dy", "3.5").attr("fill", "#ffffff")
+            .style("font-size", "11px").style("font-weight", "bold").text("+");
 
-    const quickLinkBtn = hoverControls.append("g")
-        .attr("class", "quick-control-btn")
-        .attr("transform", "translate(22, 12)")
-        .call(d3.drag()
-            .on("start", function(e, d) {
-                e.sourceEvent.stopPropagation();
-                isDraggingLink = true;
-                dragSourceNode = d;
-                dragLine.style("display", "block")
-                    .attr("x1", d.x).attr("y1", d.y)
-                    .attr("x2", d.x).attr("y2", d.y);
-            })
-            .on("drag", function(e) {
-                const mouseCoords = d3.pointer(e.sourceEvent, svg.node());
-                dragLine.attr("x2", mouseCoords[0]).attr("y2", mouseCoords[1]);
-            })
-            .on("end", async function(e) {
-                if (!isDraggingLink) return;
-                isDraggingLink = false;
-                dragLine.style("display", "none");
-                const targetEl = document.elementFromPoint(e.sourceEvent.clientX, e.sourceEvent.clientY);
-                let targetNode = null;
-                if (targetEl) {
-                    const nodeGroupEl = targetEl.closest(".node-group");
-                    if (nodeGroupEl) {
-                        const matchedData = d3.select(nodeGroupEl).datum();
-                        if (matchedData && matchedData.id !== dragSourceNode.id) targetNode = matchedData;
+        const quickLinkBtn = hoverControls.append("g")
+            .attr("class", "quick-control-btn")
+            .attr("transform", "translate(22, 12)")
+            .call(d3.drag()
+                .on("start", function(e, d) {
+                    e.sourceEvent.stopPropagation();
+                    isDraggingLink = true;
+                    dragSourceNode = d;
+                    dragLine.style("display", "block")
+                        .attr("x1", d.x).attr("y1", d.y).attr("x2", d.x).attr("y2", d.y);
+                })
+                .on("drag", function(e) {
+                    const mouseCoords = d3.pointer(e.sourceEvent, svg.node());
+                    dragLine.attr("x2", mouseCoords[0]).attr("y2", mouseCoords[1]);
+                })
+                .on("end", async function(e) {
+                    if (!isDraggingLink) return;
+                    isDraggingLink = false;
+                    dragLine.style("display", "none");
+                    const targetEl = document.elementFromPoint(e.sourceEvent.clientX, e.sourceEvent.clientY);
+                    let targetNode = null;
+                    if (targetEl) {
+                        const nodeGroupEl = targetEl.closest(".node-group");
+                        if (nodeGroupEl) {
+                            const matchedData = d3.select(nodeGroupEl).datum();
+                            if (matchedData && matchedData.id !== dragSourceNode.id) targetNode = matchedData;
+                        }
                     }
-                }
-                if (targetNode) await handleDragConnect(dragSourceNode, targetNode);
-                else simulation.alpha(0.05).restart();
-                dragSourceNode = null;
-            })
-        );
-    quickLinkBtn.append("circle").attr("r", 9).attr("fill", "#4f46e5");
-    quickLinkBtn.append("text")
-        .attr("text-anchor", "middle").attr("dy", "3").attr("fill", "#ffffff")
-        .style("font-size", "10px").style("font-weight", "bold").text("↗");
-
-    nodeGroup.call(d3.drag()
-        .on("start", (e, d) => {
-            if (isDraggingLink) return;
-            if (!e.active) simulation.alphaTarget(0.3).restart();
-            d.fx = d.x; d.fy = d.y;
-        })
-        .on("drag", (e, d) => {
-            if (isDraggingLink) return;
-            d.fx = e.x; d.fy = e.y;
-        })
-        .on("end", (e, d) => {
-            if (isDraggingLink) return;
-            if (!e.active) simulation.alphaTarget(0);
-            d.fx = null; d.fy = null;
-        }));
+                    if (targetNode) await handleDragConnect(dragSourceNode, targetNode);
+                    else simulation.alpha(0.05).restart();
+                    dragSourceNode = null;
+                })
+            );
+        quickLinkBtn.append("circle").attr("r", 9).attr("fill", "#4f46e5");
+        quickLinkBtn.append("text")
+            .attr("text-anchor", "middle").attr("dy", "3").attr("fill", "#ffffff")
+            .style("font-size", "10px").style("font-weight", "bold").text("↗");
+    }
 
     svg.on("click", (e) => {
         if (e.target.tagName === "svg") {
             selectedLinkId = null;
             renderLinkHighlight();
+            unfocusAll();
         }
     });
 
     simulation.on("tick", () => {
-        const padding = 35;
         const w = getCanvasWidth();
-
         nodesData.forEach(d => {
             d.x = Math.max(LEFT_MARGIN + 35, Math.min(w - RIGHT_MARGIN - 35, d.x));
             d.y = Math.max(TOP_MARGIN + 35, Math.min(HEIGHT - BOTTOM_MARGIN - 35, d.y));
@@ -619,6 +502,22 @@ function renderGraph() {
             .attr("y", d => (d.source.y + d.target.y) / 2 - 6);
         nodeGroup.attr("transform", d => `translate(${d.x},${d.y})`);
     });
+
+    nodeGroup.call(d3.drag()
+    .on("start", (e, d) => {
+        if (isDraggingLink) return;
+        if (!e.active) simulation.alphaTarget(0.3).restart();
+        d.fx = d.x; d.fy = d.y;
+    })
+    .on("drag", (e, d) => {
+        if (isDraggingLink) return;
+        d.fx = e.x; d.fy = e.y;
+    })
+    .on("end", (e, d) => {
+        if (isDraggingLink) return;
+        if (!e.active) simulation.alphaTarget(0);
+        d.fx = null; d.fy = null;
+    }));
 }
 
 async function handleDragConnect(sourceNode, targetNode) {
@@ -627,23 +526,16 @@ async function handleDragConnect(sourceNode, targetNode) {
         (l.source === sourceNode.id && l.target === targetNode.id)
     );
     if (isDuplicate) { alert("A link between these two nodes already exists!"); simulation.alpha(0.05).restart(); return; }
-
     const { data: newLinkArray, error } = await supabaseClient
-        .from('links')
-        .insert([{ source: sourceNode.id, target: targetNode.id, description: 'new link', graph_id: currentGraphId }])
-        .select();
-
+        .from('links').insert([{ source: sourceNode.id, target: targetNode.id, description: 'new link', graph_id: currentGraphId }]).select();
     if (error) { console.error("Failed to create link:", error); simulation.alpha(0.05).restart(); return; }
-
     await fetchData();
     if (newLinkArray && newLinkArray.length > 0) {
         selectedLinkId = newLinkArray[0].id;
         renderGraph();
         const createdLink = linksData.find(l => l.id === selectedLinkId);
         if (createdLink) openLinkEditor(createdLink);
-    } else {
-        renderGraph();
-    }
+    } else { renderGraph(); }
 }
 
 // ============================================================
@@ -670,9 +562,7 @@ function updateLinkTypeSelectOptions(currentTypeId) {
     const selectEl = d3.select("#editLinkTypeSelect");
     selectEl.selectAll("*").remove();
     selectEl.append("option").attr("value", "").text("(No type — default grey)");
-    dbLinkTypes.forEach(t => {
-        selectEl.append("option").attr("value", t.id).text(t.type_name);
-    });
+    dbLinkTypes.forEach(t => { selectEl.append("option").attr("value", t.id).text(t.type_name); });
     if (currentTypeId) selectEl.property("value", currentTypeId);
 }
 
@@ -692,6 +582,7 @@ function renderDropdownMenu() {
 }
 
 window.toggleRightPanel = function() {
+    if (isViewer()) return;
     const panel = d3.select("#rightPanel");
     const btn = document.getElementById("hoverActionBtn");
     const isOpening = !panel.classed("active");
@@ -712,6 +603,7 @@ window.toggleRightPanel = function() {
 };
 
 window.openCreatorConsole = function() {
+    if (isViewer()) return;
     d3.select("#rightPanel").classed("active", true);
     document.getElementById("hoverActionBtn").classList.add("open");
     hideAllPanelSections();
@@ -722,16 +614,14 @@ window.openCreatorConsole = function() {
     syncLayoutAndSim();
 };
 
-window.toggleRepresentPanel = function () {
+window.toggleRepresentPanel = function() {
     const panel = document.getElementById("representPanel");
     panel.classList.toggle("hidden");
-
-    if (!panel.classList.contains("hidden")) {
-        renderRepresentPanel();
-    }
+    if (!panel.classList.contains("hidden")) renderRepresentPanel();
 };
 
 window.openExtendObjectConsole = function(parentNodes) {
+    if (isViewer()) return;
     openCreatorConsole();
     switchCreatorMode('OBJECT');
     parentNodeIdForExtend = parentNodes.id;
@@ -756,6 +646,7 @@ window.triggerInlineTypeForm = function() {
 };
 
 window.openNodeEditor = function(node) {
+    if (isViewer()) return;
     d3.select("#rightPanel").classed("active", true);
     hideAllPanelSections();
     d3.select("#nodeEditContainer").style("display", "block");
@@ -767,6 +658,7 @@ window.openNodeEditor = function(node) {
 };
 
 window.openLinkEditor = function(link) {
+    if (isViewer()) return;
     d3.select("#rightPanel").classed("active", true);
     hideAllPanelSections();
     d3.select("#linkFormContainer").style("display", "block");
@@ -793,31 +685,47 @@ function hideAllPanelSections() {
     d3.select("#creatorConsoleContainer").style("display", "none");
     d3.select("#nodeEditContainer").style("display", "none");
     d3.select("#linkFormContainer").style("display", "none");
+    d3.select("#nodeListContainer").style("display", "none");
 }
 
 function renderRepresentPanel() {
     const panel = document.getElementById("representList");
     if (!panel) return;
-
     const data = buildRepresentList();
     panel.innerHTML = "";
-
     data.forEach(item => {
         const div = document.createElement("div");
         div.className = "rep-item";
-
         div.innerHTML = `
             <div class="rep-value">${item.represent}</div>
             <div class="rep-label">${item.label} [${item.type}]</div>
         `;
-
-        div.onclick = () => {
-            focusNode(item.id);
-        };
-
+        div.onclick = () => focusNode(item.id);
         panel.appendChild(div);
     });
 }
+
+function focusNode(targetId) {
+    // 淡化所有非目標節點
+    svg.selectAll(".node-group")
+        .transition().duration(200)
+        .style("opacity", d => d.id === targetId ? 1 : 0.15);
+
+    svg.selectAll(".link-group")
+        .transition().duration(200)
+        .style("opacity", 0.15);
+}
+
+function unfocusAll() {
+    svg.selectAll(".node-group")
+        .transition().duration(200)
+        .style("opacity", 1);
+
+    svg.selectAll(".link-group")
+        .transition().duration(200)
+        .style("opacity", 1);
+}
+
 
 function syncLayoutAndSim() {
     const currentWidth = getCanvasWidth();
@@ -826,31 +734,142 @@ function syncLayoutAndSim() {
 }
 
 // ============================================================
-// CRUD
+// CRUD — all guarded by isViewer()
 // ============================================================
 
+window.toggleNodeListPanel = function() {
+    const panel = d3.select("#rightPanel");
+    const nodeListBtn = document.getElementById("nodeListBtn");
+    const isNodeListOpen = panel.classed("active") &&
+        d3.select("#nodeListContainer").style("display") !== "none";
+
+    if (isNodeListOpen) {
+        // 關閉面板，但保留勾選狀態，不恢復顯示
+        panel.classed("active", false);
+        nodeListBtn.classList.remove("open");
+    } else {
+        // 開啟
+        panel.classed("active", true);
+        document.getElementById("hoverActionBtn").classList.remove("open");
+        nodeListBtn.classList.add("open");
+        hideAllPanelSections_withNodeList();
+        d3.select("#nodeListContainer").style("display", "block");
+        document.getElementById("rightPanelTitle").textContent = "Node List";
+        renderNodeListPanel();
+    }
+
+    setTimeout(() => {
+        const currentWidth = getCanvasWidth();
+        svg.attr("width", currentWidth);
+        if (simulation) simulation.force("center", d3.forceCenter(currentWidth / 2, HEIGHT / 2)).alpha(0.2).restart();
+    }, 310);
+};
+ 
+function hideAllPanelSections_withNodeList() {
+    d3.select("#creatorConsoleContainer").style("display", "none");
+    d3.select("#nodeEditContainer").style("display", "none");
+    d3.select("#linkFormContainer").style("display", "none");
+    d3.select("#nodeListContainer").style("display", "none");
+}
+ 
+function renderNodeListPanel() {
+    const container = document.getElementById('nodeListContent');
+    container.innerHTML = '';
+ 
+    // 按 type 分組
+    const groups = {};
+    nodesData.forEach(n => {
+        const key = n.type_id || '__none__';
+        if (!groups[key]) groups[key] = { typeName: n.typeName, color: n.color, nodes: [] };
+        groups[key].nodes.push(n);
+    });
+ 
+    Object.values(groups).forEach(group => {
+        const header = document.createElement('div');
+        header.className = 'node-list-type-header';
+        header.innerHTML = `
+            <span class="node-list-type-dot" style="background:${group.color}"></span>
+            <span class="node-list-type-name">${group.typeName}</span>
+        `;
+        container.appendChild(header);
+ 
+        group.nodes.forEach(n => {
+            const relatedLinks = linksData.filter(l => {
+                const srcId = typeof l.source === 'object' ? l.source.id : l.source;
+                const tgtId = typeof l.target === 'object' ? l.target.id : l.target;
+                return srcId === n.id || tgtId === n.id;
+            });
+ 
+            const relChips = relatedLinks.map(l => {
+                const srcId = typeof l.source === 'object' ? l.source.id : l.source;
+                const isSource = srcId === n.id;
+                return `<span class="node-list-rel-chip">${isSource ? '→' : '←'} ${l.description}</span>`;
+            }).join('');
+ 
+            const item = document.createElement('div');
+            item.className = 'node-list-item';
+            item.innerHTML = `
+                <div class="node-list-item-top">
+                    <label class="node-list-checkbox-label">
+                        <input type="checkbox" class="node-list-checkbox"
+                            data-node-id="${n.id}"
+                            ${nodeVisibility[n.id] !== false ? 'checked' : ''}>
+                        <span class="node-list-label">${n.label}</span>
+                    </label>
+                </div>
+                ${relChips ? `<div class="node-list-rels">${relChips}</div>` : ''}
+            `;
+ 
+            item.querySelector('.node-list-checkbox').addEventListener('change', (e) => {
+                nodeVisibility[n.id] = e.target.checked;
+                applyNodeVisibility();
+            });
+ 
+            container.appendChild(item);
+        });
+    });
+}
+ 
+function applyNodeVisibility() {
+    const visibleNodeIds = new Set(
+        nodesData.filter(n => nodeVisibility[n.id] !== false).map(n => n.id)
+    );
+ 
+    svg.selectAll(".node-group")
+        .style("display", d => visibleNodeIds.has(d.id) ? null : "none");
+ 
+    svg.selectAll(".link-group")
+        .style("display", d => {
+            const srcId = typeof d.source === 'object' ? d.source.id : d.source;
+            const tgtId = typeof d.target === 'object' ? d.target.id : d.target;
+            return (visibleNodeIds.has(srcId) && visibleNodeIds.has(tgtId)) ? null : "none";
+        });
+}
+
 window.handleCreateTypeOnly = async function() {
+    if (isViewer()) return;
     const tName = d3.select("#newObjTypeName").property("value").trim();
     const tColor = d3.select("#newObjTypeColor").property("value");
     if (!tName) return alert("Please enter a type name!");
     await supabaseClient.from('node_types').insert([{ type_name: tName, color: tColor, graph_id: currentGraphId }]);
     d3.select("#newObjTypeName").property("value", "");
-    await fetchData(); renderGraph(); renderDropdownMenu(); updateTypeSelectOptions();updateRepToggleVisibility();
+    await fetchData(); renderGraph(); renderDropdownMenu(); updateTypeSelectOptions(); updateRepToggleVisibility();
 };
 
 window.handleCreateRelationType = async function() {
+    if (isViewer()) return;
     const tName = d3.select("#newRelTypeName").property("value").trim();
     const tColor = d3.select("#newRelTypeColor").property("value");
     if (!tName) return alert("Please enter a relation type name!");
     const { error } = await supabaseClient.from('link_types').insert([{ type_name: tName, color: tColor, graph_id: currentGraphId }]);
     if (error) { console.error(error); return; }
     d3.select("#newRelTypeName").property("value", "");
-    await fetchData();
-    updateRepToggleVisibility();
+    await fetchData(); updateRepToggleVisibility();
     alert(`Relation type "${tName}" saved!`);
 };
 
 window.handleCreateObject = async function() {
+    if (isViewer()) return;
     const label = d3.select("#objLabel").property("value").trim();
     if (!label) return alert("Please enter a node label!");
     let finalTypeId = d3.select("#objTypeSelect").property("value");
@@ -880,6 +899,7 @@ window.handleCreateObject = async function() {
 };
 
 window.handleUpdateNode = async function() {
+    if (isViewer()) return;
     const id = d3.select("#editNodeId").property("value");
     const label = d3.select("#editNodeLabel").property("value").trim();
     const type_id = d3.select("#editNodeTypeSelect").property("value");
@@ -890,6 +910,7 @@ window.handleUpdateNode = async function() {
 };
 
 window.handleDeleteNode = async function() {
+    if (isViewer()) return;
     const id = d3.select("#editNodeId").property("value");
     if (id && confirm("Delete this node?")) {
         await supabaseClient.from('nodes').delete().eq('id', id);
@@ -899,6 +920,7 @@ window.handleDeleteNode = async function() {
 };
 
 window.handleSaveLink = async function() {
+    if (isViewer()) return;
     const id = d3.select("#linkId").property("value");
     const description = d3.select("#linkLabel").property("value").trim();
     const type_id = d3.select("#editLinkTypeSelect").property("value") || null;
@@ -909,6 +931,7 @@ window.handleSaveLink = async function() {
 };
 
 window.handleDeleteLink = async function() {
+    if (isViewer()) return;
     const id = d3.select("#linkId").property("value");
     if (!id || !confirm("Delete this link?")) return;
     const { error } = await supabaseClient.from('links').delete().eq('id', id);

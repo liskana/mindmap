@@ -512,11 +512,11 @@ button.danger:hover {
     transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
-#top-right-wrapper:hover .dropdown-content {
+/* #top-right-wrapper:hover .dropdown-content {
     display: block;
     opacity: 1;
     transform: translateY(0);
-}
+} */
 
 .dropdown-section { margin-bottom: 10px; }
 .dropdown-section:last-child { margin-bottom: 0; }
@@ -704,4 +704,111 @@ button.danger:hover {
 /* hover */
 #repToggleBtn:hover {
     background: #3730a3;
+}
+
+/* 加到 style.css 末尾 */
+
+#nodeListBtn {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: none;
+    background: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    position: absolute;
+    top: 66px;
+    right: 16px;
+    z-index: 9999;
+    font-size: 16px;
+    color: #475569;
+    transition: all 0.25s ease;
+}
+
+#nodeListBtn:hover { transform: scale(1.05); color: #726bff; }
+#nodeListBtn.open { background: #726bff; color: #ffffff; }
+
+#nodeListContent {
+    overflow-y: auto;
+    max-height: calc(100vh - 120px);
+    padding-bottom: 20px;
+}
+
+.node-list-type-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 0 8px;
+    border-bottom: 1px solid #f1f5f9;
+    margin-bottom: 4px;
+}
+
+.node-list-type-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.node-list-type-name {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #94a3b8;
+}
+
+.node-list-item {
+    padding: 8px 4px;
+    border-bottom: 1px solid #f8fafc;
+}
+
+.node-list-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    width: 100%;
+    text-transform: none;
+    font-size: 13px;
+    font-weight: 500;
+    color: #334155;
+    letter-spacing: 0;
+    margin: 0;
+}
+
+.node-list-checkbox {
+    width: 15px;
+    height: 15px;
+    accent-color: #726bff;
+    flex-shrink: 0;
+    cursor: pointer;
+    margin: 0;
+    padding: 0;
+}
+
+.node-list-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: #334155;
+}
+
+.node-list-rels {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 5px;
+    padding-left: 23px;
+}
+
+.node-list-rel-chip {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    background: #f1f5f9;
+    color: #64748b;
+    font-weight: 500;
 }
